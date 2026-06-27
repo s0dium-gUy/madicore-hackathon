@@ -8,9 +8,29 @@ require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") }
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const http = require("http");
+const { Server } = require("socket.io");
 const connectDB = require("./config/db");
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "*" }
+});
+app.set("io", io);
+
+io.on("connection", (socket) => {
+  // Doctor clients can join their specific room to listen for updates
+  socket.on("joinDoctorRoom", (doctorId) => {
+    socket.join(doctorId);
+  });
+
+  // Patient clients join their specific room for personal updates
+  socket.on("joinPatientRoom", (patientId) => {
+    socket.join(patientId);
+  });
+});
+
 const PORT = process.env.PORT || 5000;
 
 // ── Middleware ───────────────────────────────────────────────
@@ -22,6 +42,7 @@ app.use("/api", require("./routes/auth"));
 app.use("/api/hospital", require("./routes/hospital"));
 app.use("/api/doctors", require("./routes/doctors"));
 app.use("/api/patients", require("./routes/patients"));
+app.use("/api/appointments", require("./routes/appointments"));
 
 // ── Health Check ────────────────────────────────────────────
 app.get("/api/health", (_req, res) => {
@@ -45,7 +66,7 @@ async function bootstrap() {
     await seedDatabase();
   }
 
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`🏥  Hospital Queue API running → http://localhost:${PORT}`);
     console.log(`   Master endpoint → http://localhost:${PORT}/api/hospital`);
   });
@@ -55,4 +76,4 @@ if (require.main === module) {
   bootstrap();
 }
 
-module.exports = { app };
+module.exports = { app, server, io };
