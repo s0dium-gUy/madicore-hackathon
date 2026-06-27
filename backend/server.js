@@ -14,21 +14,34 @@ const connectDB = require("./config/db");
 
 const app = express();
 const server = http.createServer(app);
+const jwt = require("jsonwebtoken");
+const User = require("./models/User");
+
 const io = new Server(server, {
   cors: { origin: "*" }
 });
 app.set("io", io);
 
-io.on("connection", (socket) => {
-  // Doctor clients can join their specific room to listen for updates
-  socket.on("joinDoctorRoom", (doctorId) => {
-    socket.join(doctorId);
-  });
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) return next(new Error("Authentication error: No token provided"));
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key');
+    const user = await User.findById(decoded.id).lean();
+    if (!user) return next(new Error("Authentication error: User not found"));
+    
+    socket.user = user;
+    next();
+  } catch (err) {
+    next(new Error("Authentication error: Invalid token"));
+  }
+});
 
-  // Patient clients join their specific room for personal updates
-  socket.on("joinPatientRoom", (patientId) => {
-    socket.join(patientId);
-  });
+io.on("connection", (socket) => {
+  // Automatically place the incoming connection into a tab-isolated room
+  if (socket.user && socket.user.referenceId) {
+    socket.join(socket.user.referenceId);
+  }
 });
 
 const PORT = process.env.PORT || 5000;
