@@ -109,7 +109,13 @@ exports.bookAppointment = async (req, res) => {
       await existingAppointment.save();
       
       const io = req.app.get('io');
-      if (io) io.to(doctorId).emit('appointmentUpdate');
+      if (io) {
+        io.to(doctorId).emit('newAppointment', {
+          date: existingAppointment.date,
+          timeSlot: existingAppointment.timeSlot,
+          patient: { id: req.user.referenceId, name: req.user.name }
+        });
+      }
       
       return res.status(200).json({ message: "Appointment successfully rescheduled.", appointment: existingAppointment });
     }
@@ -126,7 +132,13 @@ exports.bookAppointment = async (req, res) => {
     });
 
     const io = req.app.get('io');
-    if (io) io.to(doctorId).emit('appointmentUpdate');
+    if (io) {
+      io.to(doctorId).emit('newAppointment', {
+        date: appointment.date,
+        timeSlot: appointment.timeSlot,
+        patient: { id: req.user.referenceId, name: req.user.name }
+      });
+    }
 
     return res.status(201).json({ message: "Appointment successfully booked.", appointment });
   } catch (error) {
@@ -179,7 +191,12 @@ exports.cancelAppointment = async (req, res) => {
     await appointment.save();
 
     const io = req.app.get('io');
-    if (io) io.to(appointment.doctorId).emit('appointmentUpdate');
+    if (io) {
+      io.to(appointment.doctorId).emit('appointmentCancelled', {
+        date: appointment.date,
+        timeSlot: appointment.timeSlot
+      });
+    }
 
     return res.json({ message: "Appointment successfully cancelled.", appointment });
   } catch (error) {

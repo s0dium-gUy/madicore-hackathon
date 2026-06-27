@@ -287,14 +287,61 @@ function DoctorsSection({ doctors, user, onRefresh, toast }) {
 
   useEffect(() => {
     if (isDoctor && myProfile) {
-      const socket = io(); // Connects to same origin by default
-      socket.emit('joinDoctorRoom', myProfile.id);
+      const token = sessionStorage.getItem('token');
+      const socket = io({
+        auth: { token },
+        transports: ['websocket']
+      });
+      // The backend now joins the room automatically, but keeping the emit as fallback or logging is fine, though we don't need it. 
+      // Actually we don't need socket.emit('joinDoctorRoom') since the backend middleware does it.
       
-      socket.on('appointmentUpdate', () => {
-        fetchAgenda();
+      // Listen live for new appointments
+      socket.on('newAppointment', (data) => {
+        console.log("Real-time booking received for:", data);
+        setAgenda((prevAgenda) => {
+          return prevAgenda.map(day => {
+            if (day.date === data.date) {
+              return {
+                ...day,
+                slots: day.slots.map(slot => {
+                  if (slot.time === data.timeSlot) {
+                    return { ...slot, status: 'Booked', patient: data.patient };
+                  }
+                  return slot;
+                })
+              };
+            }
+            return day;
+          });
+        });
+      });
+
+      // Listen live for the cancellation event
+      socket.on('appointmentCancelled', (data) => {
+        console.log("Real-time cancellation received for:", data);
+        
+        // Use a functional state update to force an instant, visual UI re-render
+        setAgenda((prevAgenda) => {
+          return prevAgenda.map(day => {
+            if (day.date === data.date) {
+              return {
+                ...day,
+                slots: day.slots.map(slot => {
+                  if (slot.time === data.timeSlot) {
+                    return { ...slot, status: 'Available', patient: undefined };
+                  }
+                  return slot;
+                })
+              };
+            }
+            return day;
+          });
+        });
       });
 
       return () => {
+        socket.off('newAppointment');
+        socket.off('appointmentCancelled');
         socket.disconnect();
       };
     }
@@ -499,8 +546,11 @@ function PatientsSection({ patients, doctors, appointments, user, onRefresh, toa
 
   useEffect(() => {
     if (isPatient) {
-      const socket = io();
-      socket.emit('joinPatientRoom', user.referenceId);
+      const token = sessionStorage.getItem('token');
+      const socket = io({
+        auth: { token },
+        transports: ['websocket']
+      });
       
       socket.on('appointmentCancelledByDoctor', (data) => {
         toast(`Alert: Your appointment on ${data.date} at ${data.timeSlot} was cancelled by the doctor.`, false);
