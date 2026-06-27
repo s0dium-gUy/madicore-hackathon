@@ -2,6 +2,9 @@ const Doctor = require("../models/Doctor");
 const Patient = require("../models/Patient");
 const PastRecord = require("../models/PastRecord");
 const Prescription = require("../models/Prescription");
+const User = require("../models/User");
+const Appointment = require("../models/Appointment");
+const bcrypt = require("bcryptjs");
 
 async function seedDatabase() {
   try {
@@ -11,6 +14,37 @@ async function seedDatabase() {
       Patient.deleteMany({}),
       PastRecord.deleteMany({}),
       Prescription.deleteMany({}),
+      User.deleteMany({}),
+      Appointment.deleteMany({}),
+    ]);
+
+    const salt = await bcrypt.genSalt(10);
+    const doctorPassword = await bcrypt.hash("madicore123", salt);
+    const adminPassword = await bcrypt.hash("admin123", salt);
+    const patientPassword = await bcrypt.hash("patient123", salt);
+
+    // Users
+    await User.insertMany([
+      {
+        email: "admin@madicore.com",
+        password: adminPassword,
+        name: "Riya Kapoor",
+        role: "admin",
+      },
+      {
+        email: "doctor@madicore.com",
+        password: doctorPassword,
+        name: "Dr. Sharma",
+        role: "doctor",
+        referenceId: "DOC-101",
+      },
+      {
+        email: "naman@madicore.com",
+        password: patientPassword,
+        name: "Naman Gabbur",
+        role: "patient",
+        referenceId: "PAT-001",
+      },
     ]);
 
     // Doctors
@@ -21,8 +55,8 @@ async function seedDatabase() {
         specialization: "General Medicine",
         status: "available",
         statusLastUpdated: new Date("2026-06-27T10:00:00Z"),
-        availabilitySchedule: "10:00-13:00, 14:00-18:00",
-        currentPatientCount: 2,
+        availability: [],
+        currentPatientCount: 0,
       },
       {
         id: "DOC-102",
@@ -30,7 +64,7 @@ async function seedDatabase() {
         specialization: "Orthopedics",
         status: "on_break",
         statusLastUpdated: new Date("2026-06-27T12:30:00Z"),
-        availabilitySchedule: "09:00-12:00",
+        availability: [],
         currentPatientCount: 0,
       },
     ]);
@@ -40,10 +74,6 @@ async function seedDatabase() {
       id: "PAT-001",
       name: "Naman Gabbur",
       tokenNumber: "T-01",
-      queueStatus: "waiting",
-      routingPreference: "fastest_available",
-      assignedDoctorId: "DOC-101",
-      bookedTimeSlot: "10:30-10:45",
       age: 21,
       bloodGroup: "O+",
       bp: "120/80",
@@ -67,7 +97,7 @@ async function seedDatabase() {
       issuedBy: "DOC-101",
     });
 
-    console.log("✔  Database successfully seeded with mock data!");
+    console.log("✔  Database successfully seeded with mock data (including Appointments)!");
   } catch (err) {
     console.error("✖  Auto-seeding failed:", err.message);
   }
