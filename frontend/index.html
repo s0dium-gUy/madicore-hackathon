@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart OPD — Queue Management System</title>
+  <meta name="description" content="Modern outpatient department queue management dashboard for doctors and patients with live tracking, vitals monitoring, and prescription management." />
+
+  <!-- Google Fonts: Inter + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════
+       APP HEADER
+       ═══════════════════════════════════════════════ -->
+  <header class="app-header" id="app-header">
+    <div class="app-header__brand">
+      <div class="app-header__logo">🏥</div>
+      <div>
+        <div class="app-header__title">Smart OPD</div>
+        <div class="app-header__subtitle">Queue Management System</div>
+      </div>
+    </div>
+    <div class="app-header__meta">
+      <span>
+        <span class="app-header__live-dot"></span>
+        System Live
+      </span>
+      <span id="live-clock">--:--:-- --</span>
+    </div>
+  </header>
+
+
+  <!-- ═══════════════════════════════════════════════
+       NAVIGATION TABS
+       ═══════════════════════════════════════════════ -->
+  <nav class="nav-tabs" id="nav-tabs" aria-label="Dashboard navigation">
+    <button class="nav-tab nav-tab--active" data-view="view-doctors" id="tab-doctors">
+      <span class="nav-tab__icon">🩺</span>
+      Doctor Overview
+    </button>
+    <button class="nav-tab" data-view="view-patients" id="tab-patients">
+      <span class="nav-tab__icon">🧑‍🤝‍🧑</span>
+      Patient Tracking
+    </button>
+  </nav>
+
+
+  <!-- ═══════════════════════════════════════════════
+       MAIN CONTENT
+       ═══════════════════════════════════════════════ -->
+  <main class="main-content" id="main-content">
+
+    <!-- ──────────────────────────────────────────
+         VIEW 1: DOCTOR OVERVIEW DASHBOARD
+         ────────────────────────────────────────── -->
+    <section class="view view--active" id="view-doctors" aria-label="Doctor overview dashboard">
+      <div class="section-header">
+        <div class="section-header__title">
+          <div class="section-header__icon">🩺</div>
+          <div>
+            <h2>Doctor Overview</h2>
+            <p class="text-sm">Real-time availability and schedule tracker</p>
+          </div>
+        </div>
+        <span class="section-header__count" id="doctor-count">0</span>
+      </div>
+
+      <div class="doctors-grid" id="doctors-grid">
+        <!-- Doctor cards injected by JS -->
+      </div>
+    </section>
+
+
+    <!-- ──────────────────────────────────────────
+         VIEW 2: PATIENT LIVE TRACKING DASHBOARD
+         ────────────────────────────────────────── -->
+    <section class="view" id="view-patients" aria-label="Patient live tracking dashboard">
+      <div class="section-header">
+        <div class="section-header__title">
+          <div class="section-header__icon">📋</div>
+          <div>
+            <h2>Patient Live Tracking</h2>
+            <p class="text-sm">Queue status, vitals, and prescription monitoring</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Patient Banner -->
+      <div class="patient-banner" id="patient-banner">
+        <!-- Injected by JS -->
+      </div>
+
+      <!-- Status Info Bar -->
+      <div class="status-bar" id="patient-status-bar">
+        <!-- Injected by JS -->
+      </div>
+
+      <!-- Two-Column Grid: Vitals + Records & Prescriptions -->
+      <div class="patient-grid">
+        <!-- Left Column: Vitals -->
+        <div class="panel" id="patient-vitals">
+          <!-- Injected by JS -->
+        </div>
+
+        <!-- Right Column: Stacked panels -->
+        <div style="display:flex; flex-direction:column; gap:var(--space-6);">
+          <div class="panel" id="patient-records">
+            <!-- Injected by JS -->
+          </div>
+          <div class="panel" id="patient-prescriptions">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

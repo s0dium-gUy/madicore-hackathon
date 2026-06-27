@@ -1,0 +1,14 @@
+{
+  "name": "smart-opd-system",
+  "version": "1.0.0",
+  "description": "Smart OPD Queue Management System",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "cors": "^2.8.5"
+  }
+}
