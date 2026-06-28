@@ -26,7 +26,7 @@ async function request(method, path, body) {
   }
 
   if (!res.ok) {
-    const err = new Error(data.error || `HTTP ${res.status}`)
+    const err = new Error(data.error || data.message || `HTTP ${res.status}`)
     err.status = res.status
     // If unauthorized, could trigger a logout event here
     throw err

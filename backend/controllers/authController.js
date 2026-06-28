@@ -134,11 +134,13 @@ exports.doctorSignup = async (req, res) => {
 // @access  Public
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email: rawEmail, password } = req.body;
 
-    if (!email || !password) {
+    if (!rawEmail || !password) {
       return res.status(400).json({ error: 'Please provide email and password' });
     }
+
+    const email = rawEmail.trim().toLowerCase();
 
     // First check if user exists as an admin or doctor
     let user = await User.findOne({ email, role: { $in: ['admin', 'doctor'] } }).select('+password');
