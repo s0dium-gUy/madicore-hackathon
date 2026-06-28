@@ -104,15 +104,17 @@ export default function Dashboard({ user, onLogout, darkMode, onToggleDark }) {
               />
             )}
 
-            {/* Prescriptions section */}
-            <Prescriptions
-              prescriptions={data.currentPrescriptions}
-              patients={data.patients}
-              doctors={data.doctors}
-              user={user}
-              onRefresh={refresh}
-              toast={toast}
-            />
+            {/* Prescriptions section (patients only — doctors manage per-patient) */}
+            {!isDoctor && (
+              <Prescriptions
+                prescriptions={data.currentPrescriptions}
+                patients={data.patients}
+                doctors={data.doctors}
+                user={user}
+                onRefresh={refresh}
+                toast={toast}
+              />
+            )}
           </>
         )
 
@@ -139,7 +141,16 @@ export default function Dashboard({ user, onLogout, darkMode, onToggleDark }) {
         )
 
       case 'prescriptions':
-        return (
+        return isDoctor ? (
+          <PatientProfile
+            patients={data.patients}
+            doctors={data.doctors}
+            appointments={data.appointments || []}
+            user={user}
+            onRefresh={refresh}
+            toast={toast}
+          />
+        ) : (
           <Prescriptions
             prescriptions={data.currentPrescriptions}
             patients={data.patients}
