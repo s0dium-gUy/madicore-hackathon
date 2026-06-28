@@ -52,9 +52,18 @@ async function seed() {
     console.log("✔  Seeded 2 doctors.");
 
     // ── Patients ──
+    const bcrypt = require("bcryptjs");
+    const salt = await bcrypt.genSalt(10);
+    const patientPassword = await bcrypt.hash("patient123", salt);
+
     await Patient.create({
       id: "PAT-001",
       name: "Naman Gabbur",
+      fullName: "Naman Gabbur",
+      email: "naman@madicore.com",
+      password: patientPassword,
+      isVerified: true,
+      gender: "Male",
       tokenNumber: "T-01",
       queueStatus: "waiting",
       routingPreference: "fastest_available",

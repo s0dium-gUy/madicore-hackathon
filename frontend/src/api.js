@@ -106,3 +106,14 @@ export const markComplete = (patientId) =>
 
 export const createPrescription = (patientId, prescriptionId, medication, issuedBy) =>
   request('POST', `/patients/${patientId}/prescription`, { prescriptionId, medication, issuedBy })
+
+export const patientSignup = (fullName, age, gender, email, password) =>
+  request('POST', '/auth/patient/signup', { fullName, age, gender, email, password })
+
+export const verifyOtp = async (email, otp) => {
+  const res = await request('POST', '/auth/verify-otp', { email, otp });
+  if (res.token) {
+    sessionStorage.setItem('token', res.token);
+  }
+  return res;
+}

@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import * as api from './api'
 import { io } from 'socket.io-client'
+import Welcome from './pages/Welcome'
+import PatientSignup from './components/PatientSignup'
+import OtpVerify from './components/OtpVerify'
 
 // ── Color Maps ──────────────────────────────────────────────
 const STATUS_COLORS = {
@@ -26,21 +29,55 @@ const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "F
 
 export default function App() {
   const [user, setUser] = useState(null)
+  const [view, setView] = useState('welcome') // 'welcome', 'login', 'signup', 'otp'
+  const [signupEmail, setSignupEmail] = useState('')
 
   const handleLogout = () => {
     api.logout()
     setUser(null)
+    setView('welcome')
   }
 
-  if (!user) return <LoginPage onLogin={setUser} />
-  return <Dashboard user={user} onLogout={handleLogout} />
+  if (user) {
+    return <Dashboard user={user} onLogout={handleLogout} />
+  }
+
+  if (view === 'welcome') {
+    return <Welcome onNavigate={setView} />
+  }
+
+  if (view === 'signup') {
+    return (
+      <PatientSignup
+        onSignupSuccess={(email) => {
+          setSignupEmail(email)
+          setView('otp')
+        }}
+        onNavigate={setView}
+      />
+    )
+  }
+
+  if (view === 'otp') {
+    return (
+      <OtpVerify
+        email={signupEmail}
+        onVerificationSuccess={(loggedInUser) => {
+          setUser(loggedInUser)
+        }}
+        onNavigate={setView}
+      />
+    )
+  }
+
+  return <LoginPage onLogin={setUser} onNavigate={setView} />
 }
 
 // ═════════════════════════════════════════════════════════════
 //  LOGIN PAGE
 // ═════════════════════════════════════════════════════════════
 
-function LoginPage({ onLogin }) {
+function LoginPage({ onLogin, onNavigate }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
@@ -61,8 +98,8 @@ function LoginPage({ onLogin }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <form onSubmit={handleSubmit} className="bg-card-bg rounded-2xl shadow-soft-lg p-8 w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-tr from-purple-50 via-white to-blue-50">
+      <form onSubmit={handleSubmit} className="bg-card-bg rounded-2xl shadow-soft-lg p-8 w-full max-w-md border border-gray-100 z-10">
         <h1 className="text-2xl font-bold bg-gradient-purple-blue bg-clip-text text-transparent mb-1">
           Madicore Hospital
         </h1>
@@ -90,9 +127,27 @@ function LoginPage({ onLogin }) {
 
         <button
           type="submit" disabled={busy}
-          className="w-full bg-gradient-purple-blue text-white font-semibold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 transition"
+          className="w-full bg-gradient-purple-blue text-white font-semibold py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 transition mb-4 shadow-md shadow-purple-500/20"
         >
           {busy ? 'Signing in…' : 'Sign In'}
+        </button>
+
+        <p className="text-center text-sm text-gray-400">
+          Don't have an account?{' '}
+          <button
+            type="button"
+            onClick={() => onNavigate('signup')}
+            className="text-purple-600 font-semibold hover:underline"
+          >
+            Sign Up
+          </button>
+        </p>
+        <button
+          type="button"
+          onClick={() => onNavigate('welcome')}
+          className="w-full text-center text-xs text-gray-400 mt-4 hover:underline"
+        >
+          Back to Welcome
         </button>
       </form>
     </div>
