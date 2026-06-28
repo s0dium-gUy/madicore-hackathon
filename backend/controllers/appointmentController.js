@@ -119,6 +119,17 @@ exports.bookAppointment = async (req, res) => {
     // Business Rule: Patient can only book 1 slot per day
     const existingAppointment = await Appointment.findOne({ patientId, date });
     if (existingAppointment) {
+      // Enforce 1-hour-prior rule for rescheduling
+      const [eYear, eMonth, eDay] = existingAppointment.date.split('-');
+      const [eHours, eMinutes] = existingAppointment.timeSlot.split(':');
+      const existingTime = new Date(parseInt(eYear), parseInt(eMonth) - 1, parseInt(eDay), parseInt(eHours, 10), parseInt(eMinutes, 10));
+      const timeDiffMs = existingTime.getTime() - today.getTime();
+      const timeDiffMins = timeDiffMs / (1000 * 60);
+
+      if (timeDiffMins < 60) {
+        return res.status(400).json({ error: "Appointments can only be rescheduled at least 1 hour prior to the scheduled time." });
+      }
+
       // Overwrite / Reschedule scenario
       existingAppointment.doctorId = doctorId;
       existingAppointment.timeSlot = timeSlot;
