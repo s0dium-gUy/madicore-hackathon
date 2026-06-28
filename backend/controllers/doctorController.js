@@ -127,6 +127,24 @@ exports.updateAvailability = async (req, res) => {
   }
 };
 
+exports.getPatientPrescriptions = async (req, res) => {
+  try {
+    const Prescription = require("../models/Prescription");
+    const { patientId } = req.params;
+    const doctorId = req.user.referenceId;
+
+    const prescriptions = await Prescription.find({
+      patientId,
+      issuedBy: doctorId
+    }).lean();
+
+    return res.json(prescriptions);
+  } catch (err) {
+    console.error("[GET /api/doctors/patients/:patientId/prescriptions]", err.message);
+    return res.status(500).json({ error: "Failed to fetch patient prescriptions." });
+  }
+};
+
 function sanitize({ _id, __v, createdAt, updatedAt, ...rest }) {
   return rest;
 }

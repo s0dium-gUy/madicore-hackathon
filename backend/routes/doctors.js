@@ -16,5 +16,6 @@ const updateAvailability = ctrl.updateAvailability;
 // Doctor only actions
 router.patch("/:id/status", authorizeRoles("doctor", "admin"), ctrl.updateStatus);
 router.put("/availability", authenticateUser, authorizeDoctor, updateAvailability);
+router.get("/patients/:patientId/prescriptions", authenticateUser, authorizeDoctor, ctrl.getPatientPrescriptions);
 
 module.exports = router;

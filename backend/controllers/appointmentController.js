@@ -96,7 +96,7 @@ exports.bookAppointment = async (req, res) => {
     
     // If it's today, check if the time has passed
     if (targetMidnight.getTime() === midnightToday.getTime() && targetDate < today) {
-      return res.status(400).json({ message: "This time slot has already passed for today." });
+      return res.status(400).json({ message: "Validation failure. Selected time slot has already passed." });
     }
 
     // Business Rule: Patient can only book 1 slot per day

@@ -89,6 +89,9 @@ export const getPatientQueue = (id) =>
 export const getPatientHistory = (id) =>
   request('GET', `/patients/${id}/medical-history`)
 
+export const getDoctorPatientPrescriptions = (patientId) =>
+  request('GET', `/doctors/patients/${patientId}/prescriptions`)
+
 export const getPatientStats = (id) =>
   request('GET', `/patients/${id}/stats`)
 
@@ -104,8 +107,14 @@ export const updateQueueStatus = (patientId, queueStatus) =>
 export const markComplete = (patientId) =>
   request('PATCH', `/patients/${patientId}/complete`)
 
-export const createPrescription = (patientId, prescriptionId, medication, issuedBy) =>
-  request('POST', `/patients/${patientId}/prescription`, { prescriptionId, medication, issuedBy })
+export const createPrescription = (prescriptionId, patientId, medication) =>
+  request('POST', '/prescriptions', { prescriptionId, patientId, medication })
+
+export const updatePrescription = (id, medication, status) =>
+  request('PUT', `/prescriptions/${id}`, { medication, status })
+
+export const deletePrescription = (id) =>
+  request('DELETE', `/prescriptions/${id}`)
 
 export const patientSignup = (fullName, age, gender, email, password) =>
   request('POST', '/auth/patient/signup', { fullName, age, gender, email, password })
