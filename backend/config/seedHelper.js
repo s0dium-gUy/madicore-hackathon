@@ -73,6 +73,11 @@ async function seedDatabase() {
     await Patient.create({
       id: "PAT-001",
       name: "Naman Gabbur",
+      fullName: "Naman Gabbur",
+      email: "naman@madicore.com",
+      password: patientPassword,
+      isVerified: true,
+      gender: "Male",
       tokenNumber: "T-01",
       age: 21,
       bloodGroup: "O+",

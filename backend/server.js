@@ -1,9 +1,9 @@
+require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
+
 // ─────────────────────────────────────────────────────────────
 //  Hospital Queue Management System — server.js
 //  Stack: Node.js · Express · MongoDB (Mongoose)
 // ─────────────────────────────────────────────────────────────
-
-require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
 
 const express = require("express");
 const cors = require("cors");
@@ -27,7 +27,20 @@ io.use(async (socket, next) => {
   if (!token) return next(new Error("Authentication error: No token provided"));
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key');
-    const user = await User.findById(decoded.id).lean();
+    let user = await User.findById(decoded.id).lean();
+    if (!user) {
+      const Patient = require("./models/Patient");
+      const patient = await Patient.findById(decoded.id).lean();
+      if (patient) {
+        user = {
+          _id: patient._id,
+          id: patient._id,
+          name: patient.fullName,
+          role: 'patient',
+          referenceId: patient.id
+        };
+      }
+    }
     if (!user) return next(new Error("Authentication error: User not found"));
     
     socket.user = user;
