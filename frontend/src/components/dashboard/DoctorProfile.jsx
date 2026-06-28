@@ -275,6 +275,8 @@ export default function DoctorProfile({ doctors, user, onRefresh, toast }) {
                                 <div key={slot.time} className={`p-2.5 rounded-xl border transition-all duration-200 ${
                                   slot.status === 'Booked'
                                     ? 'bg-primary-50 dark:bg-primary-500/10 border-primary-200 dark:border-primary-500/20'
+                                    : slot.status === 'Expired'
+                                    ? 'bg-surface-100 dark:bg-surface-800/30 border-surface-200/50 dark:border-dark-border opacity-60'
                                     : 'bg-white dark:bg-dark-elevated border-surface-200 dark:border-dark-border'
                                 }`}>
                                   <div className="flex items-center gap-1.5 mb-1">
@@ -286,6 +288,8 @@ export default function DoctorProfile({ doctors, user, onRefresh, toast }) {
                                       <p className="text-primary-700 dark:text-primary-400 font-medium truncate">{slot.patient?.name}</p>
                                       <p className="text-primary-500/70 dark:text-primary-500/50 text-[10px] mt-0.5">Token: {slot.patient?.tokenNumber || slot.patient?.id}</p>
                                     </div>
+                                  ) : slot.status === 'Expired' ? (
+                                    <p className="text-danger-600 dark:text-danger-400 text-xs font-medium">Expired</p>
                                   ) : (
                                     <p className="text-success-600 dark:text-success-400 text-xs font-medium">Available</p>
                                   )}

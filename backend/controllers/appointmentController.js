@@ -29,6 +29,15 @@ exports.getAvailableSlots = async (req, res) => {
       return res.status(400).json({ error: "Date parameter is required (YYYY-MM-DD)." });
     }
 
+    const today = new Date();
+    const midnightToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const [year, month, dayStr] = date.split('-');
+    const targetMidnight = new Date(parseInt(year), parseInt(month) - 1, parseInt(dayStr));
+
+    if (targetMidnight < midnightToday) {
+      return res.json({ availableSlots: [] });
+    }
+
     const doctor = await Doctor.findOne({ id: doctorId }).lean();
     if (!doctor) return res.status(404).json({ error: "Doctor not found." });
 
@@ -54,8 +63,16 @@ exports.getAvailableSlots = async (req, res) => {
 
     const bookedSlotsSet = new Set(bookedAppointments.map(a => a.timeSlot));
 
-    // Filter out booked slots
-    const availableSlots = allSlots.filter(slot => !bookedSlotsSet.has(slot));
+    // Filter out booked slots and past slots (if date is today)
+    const availableSlots = allSlots.filter(slot => {
+      if (bookedSlotsSet.has(slot)) return false;
+      if (targetMidnight.getTime() === midnightToday.getTime()) {
+        const [hours, minutes] = slot.split(':');
+        const slotDateTime = new Date(targetMidnight.getFullYear(), targetMidnight.getMonth(), targetMidnight.getDate(), parseInt(hours, 10), parseInt(minutes, 10));
+        if (slotDateTime < today) return false;
+      }
+      return true;
+    });
 
     return res.json({ availableSlots });
   } catch (error) {
@@ -274,9 +291,16 @@ exports.getDoctorAgenda = async (req, res) => {
         for (const block of day.slots) {
           const generated = generateTimeSlots(block.startTime, block.endTime, parseInt(block.duration) || 30);
           for (const timeStr of generated) {
+            const [year, month, dayStr] = day.date.split('-');
+            const [hours, minutes] = timeStr.split(':');
+            const slotDateTime = new Date(parseInt(year), parseInt(month) - 1, parseInt(dayStr), parseInt(hours, 10), parseInt(minutes, 10));
+            const now = new Date();
+
             const booked = aptMap[`${day.date}_${timeStr}`];
             if (booked) {
               daySlots.push({ time: timeStr, status: "Booked", patient: booked.patient });
+            } else if (slotDateTime < now) {
+              daySlots.push({ time: timeStr, status: "Expired" });
             } else {
               daySlots.push({ time: timeStr, status: "Available" });
             }
