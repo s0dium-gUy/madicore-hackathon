@@ -69,6 +69,7 @@ app.use("/api/hospital", require("./routes/hospital"));
 app.use("/api/doctors", require("./routes/doctors"));
 app.use("/api/patients", require("./routes/patients"));
 app.use("/api/appointments", require("./routes/appointments"));
+app.use("/api/prescriptions", require("./routes/prescriptions"));
 
 // ── Health Check ────────────────────────────────────────────
 app.get("/api/health", (_req, res) => {

@@ -163,6 +163,7 @@ function Dashboard({ user, onLogout }) {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
+  const [selectedPatientId, setSelectedPatientId] = useState(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -226,17 +227,22 @@ function Dashboard({ user, onLogout }) {
           user={user}
           onRefresh={refresh}
           toast={showToast}
+          selectedPatientId={selectedPatientId}
+          setSelectedPatientId={setSelectedPatientId}
         />
       )}
 
-      <PrescriptionsSection
-        prescriptions={data.currentPrescriptions}
-        patients={data.patients}
-        doctors={data.doctors}
-        user={user}
-        onRefresh={refresh}
-        toast={showToast}
-      />
+      {user.role === 'patient' && (
+        <PrescriptionsSection
+          prescriptions={data.currentPrescriptions}
+          patients={data.patients}
+          doctors={data.doctors}
+          user={user}
+          onRefresh={refresh}
+          toast={showToast}
+          selectedPatient={null}
+        />
+      )}
     </div>
   )
 }
@@ -558,19 +564,33 @@ function DoctorsSection({ doctors, user, onRefresh, toast }) {
                         <div key={i} className="text-xs text-text-muted flex flex-col mb-1 border p-3 rounded-xl bg-gray-50 border-gray-100">
                           <span className="font-bold text-gray-800 text-sm mb-2 pb-1 border-b border-gray-200">{formatDate(dayObj.date)}</span>
                           <div className="grid grid-cols-2 gap-2 mt-2">
-                            {dayObj.slots && dayObj.slots.map(slot => (
-                              <div key={slot.time} className={`p-2 rounded border shadow-sm ${slot.status === 'Booked' ? 'bg-purple-50 border-purple-200' : 'bg-white border-gray-200'}`}>
-                                <span className="font-bold block text-gray-800">{slot.time}</span>
-                                {slot.status === 'Booked' ? (
-                                  <span className="text-purple-700 font-medium block truncate mt-0.5">
-                                    {slot.patient?.name} <br/>
-                                    <span className="text-xs text-purple-500">Token: {slot.patient?.tokenNumber || slot.patient?.id}</span>
-                                  </span>
-                                ) : (
-                                  <span className="text-emerald-500 font-medium block mt-0.5">Available</span>
-                                )}
-                              </div>
-                            ))}
+                            {dayObj.slots && dayObj.slots.map(slot => {
+                              const isToday = dayObj.date === new Date().toLocaleDateString('en-CA');
+                              let isExpired = false;
+                              if (isToday) {
+                                const [hours, minutes] = slot.time.split(':');
+                                const slotTime = new Date();
+                                slotTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+                                if (slotTime <= new Date()) {
+                                  isExpired = true;
+                                }
+                              }
+                              return (
+                                <div key={slot.time} className={`p-2 rounded border shadow-sm ${slot.status === 'Booked' ? 'bg-purple-50 border-purple-200' : 'bg-white border-gray-200'}`}>
+                                  <span className="font-bold block text-gray-800">{slot.time}</span>
+                                  {slot.status === 'Booked' ? (
+                                    <span className="text-purple-700 font-medium block truncate mt-0.5">
+                                      {slot.patient?.name} <br/>
+                                      <span className="text-xs text-purple-500">Token: {slot.patient?.tokenNumber || slot.patient?.id}</span>
+                                    </span>
+                                  ) : isExpired ? (
+                                    <span className="text-gray-400 font-medium block mt-0.5">Expired</span>
+                                  ) : (
+                                    <span className="text-emerald-500 font-medium block mt-0.5">Available</span>
+                                  )}
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                       ))
@@ -592,9 +612,14 @@ function DoctorsSection({ doctors, user, onRefresh, toast }) {
 //  PATIENTS SECTION (WITH CALENDAR BOOKING)
 // ═════════════════════════════════════════════════════════════
 
-function PatientsSection({ patients, doctors, appointments, user, onRefresh, toast }) {
+function PatientsSection({ patients, doctors, appointments, user, onRefresh, toast, selectedPatientId, setSelectedPatientId }) {
   const [bookingState, setBookingState] = useState({})
   const [busy, setBusy] = useState({})
+  const [prescriptions, setPrescriptions] = useState([])
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [editingRx, setEditingRx] = useState(null)
+  const [form, setForm] = useState({ prescriptionId: '', medication: '' })
+  const [rxBusy, setRxBusy] = useState(false)
   
   const isPatient = user.role === 'patient'
   const displayPatients = isPatient ? patients.filter(p => p.id === user.referenceId) : patients
@@ -617,6 +642,56 @@ function PatientsSection({ patients, doctors, appointments, user, onRefresh, toa
       };
     }
   }, [isPatient, user.referenceId, onRefresh, toast]);
+
+  useEffect(() => {
+    if (selectedPatientId && !isPatient) {
+      setShowAddForm(false)
+      setEditingRx(null)
+      setForm({ prescriptionId: '', medication: '' })
+      api.getDoctorPatientPrescriptions(selectedPatientId)
+        .then(res => setPrescriptions(res))
+        .catch(err => toast(err.message, false));
+    } else {
+      setPrescriptions([]);
+    }
+  }, [selectedPatientId, isPatient, toast]);
+
+  const handleDeleteRx = async (rx) => {
+    if (!window.confirm("Are you sure you want to delete this prescription?")) return
+    try {
+      setPrescriptions(prev => prev.filter(item => item._id !== rx._id))
+      await api.deletePrescription(rx._id)
+      toast('Prescription deleted')
+      onRefresh()
+    } catch (err) {
+      toast(err.message, false)
+      api.getDoctorPatientPrescriptions(selectedPatientId).then(setPrescriptions)
+    }
+  }
+
+  const handleSubmitPrescription = async (e) => {
+    e.preventDefault()
+    setRxBusy(true)
+    try {
+      if (editingRx) {
+        await api.updatePrescription(editingRx._id, form.medication)
+        toast('Prescription updated')
+      } else {
+        await api.createPrescription(form.prescriptionId, selectedPatientId, form.medication)
+        toast('Prescription created')
+      }
+      setForm({ prescriptionId: '', medication: '' })
+      setEditingRx(null)
+      setShowAddForm(false)
+      const res = await api.getDoctorPatientPrescriptions(selectedPatientId)
+      setPrescriptions(res)
+      onRefresh()
+    } catch (err) {
+      toast(err.message, false)
+    } finally {
+      setRxBusy(false)
+    }
+  }
 
   if (displayPatients.length === 0) return null
 
@@ -665,7 +740,13 @@ function PatientsSection({ patients, doctors, appointments, user, onRefresh, toa
           const bState = bookingState[p.id] || {}
           
           return (
-            <div key={p.id} className="bg-card-bg rounded-2xl p-5 shadow-soft">
+            <div 
+              key={p.id} 
+              onClick={() => !isPatient && setSelectedPatientId(p.id)}
+              className={`bg-card-bg rounded-2xl p-5 shadow-soft cursor-pointer transition border-2 ${
+                !isPatient && selectedPatientId === p.id ? 'border-purple-500' : 'border-transparent'
+              }`}
+            >
               <div className="flex items-center gap-3 mb-2">
                 <div>
                   <h3 className="font-semibold">{p.name}</h3>
@@ -674,7 +755,7 @@ function PatientsSection({ patients, doctors, appointments, user, onRefresh, toa
               </div>
 
               {isPatient && (
-                <div className="mt-4 border-t border-gray-100 pt-4">
+                <div className="mt-4 border-t border-gray-100 pt-4" onClick={(e) => e.stopPropagation()}>
                   
                   {/* Active Appointments Display */}
                   <div className="mb-6">
@@ -689,7 +770,8 @@ function PatientsSection({ patients, doctors, appointments, user, onRefresh, toa
                             </div>
                             <button
                               disabled={busy[apt.appointmentId]}
-                              onClick={async () => {
+                              onClick={async (e) => {
+                                e.stopPropagation();
                                 setBusy(prev => ({ ...prev, [apt.appointmentId]: true }))
                                 try {
                                   await api.cancelAppointment(apt.appointmentId)
@@ -751,7 +833,16 @@ function PatientsSection({ patients, doctors, appointments, user, onRefresh, toa
                         <p className="text-xs text-blue-500 animate-pulse">Loading slots...</p>
                       ) : bState.slots && bState.slots.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
-                          {bState.slots.map(slot => (
+                          {bState.slots.filter(slot => {
+                            const isToday = bState.date === new Date().toLocaleDateString('en-CA');
+                            if (isToday) {
+                              const [hours, minutes] = slot.split(':');
+                              const slotTime = new Date();
+                              slotTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+                              return slotTime > new Date();
+                            }
+                            return true;
+                          }).map(slot => (
                             <button
                               key={slot}
                               onClick={() => setBookingState(prev => ({ ...prev, [p.id]: { ...bState, selectedSlot: slot } }))}
@@ -784,6 +875,111 @@ function PatientsSection({ patients, doctors, appointments, user, onRefresh, toa
                   )}
                 </div>
               )}
+
+              {/* Historical prescriptions for this patient (Doctor View only) */}
+              {!isPatient && selectedPatientId === p.id && (
+                <div className="mt-4 border-t border-gray-100 pt-4" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="font-semibold text-sm text-purple-700">My Historical Prescriptions</h4>
+                    <button
+                      onClick={() => {
+                        if (showAddForm) {
+                          setShowAddForm(false)
+                          setEditingRx(null)
+                          setForm({ prescriptionId: '', medication: '' })
+                        } else {
+                          setShowAddForm(true)
+                        }
+                      }}
+                      className="text-xs bg-gradient-purple-blue text-white px-3 py-1.5 rounded-xl font-medium hover:opacity-90 transition"
+                    >
+                      {showAddForm ? 'Cancel' : '+ Add Prescription'}
+                    </button>
+                  </div>
+
+                  {showAddForm && (
+                    <form onSubmit={handleSubmitPrescription} className="bg-purple-50 rounded-xl p-4 mb-4 grid gap-3 sm:grid-cols-2">
+                      <div className="sm:col-span-2 text-xs text-purple-700 font-semibold bg-purple-100/50 p-2.5 rounded-xl border border-purple-200">
+                        {editingRx ? `Editing Prescription: ${editingRx.prescriptionId}` : 'Creating New Prescription'}
+                      </div>
+
+                      {!editingRx && (
+                        <input
+                          type="text"
+                          placeholder="Prescription ID (e.g. RX-100)"
+                          required
+                          value={form.prescriptionId}
+                          onChange={e => setForm(f => ({ ...f, prescriptionId: e.target.value }))}
+                          className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-300"
+                        />
+                      )}
+
+                      <input
+                        type="text"
+                        placeholder="Medication (e.g. Amoxicillin 250mg)"
+                        required
+                        value={form.medication}
+                        onChange={e => setForm(f => ({ ...f, medication: e.target.value }))}
+                        className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-300 sm:col-span-2"
+                      />
+
+                      <div className="sm:col-span-2 flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={rxBusy}
+                          className="bg-gradient-purple-blue text-white font-semibold text-sm px-6 py-2 rounded-xl hover:opacity-90 disabled:opacity-40 transition"
+                        >
+                          {rxBusy ? 'Saving…' : editingRx ? 'Update' : 'Create'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAddForm(false)
+                            setEditingRx(null)
+                            setForm({ prescriptionId: '', medication: '' })
+                          }}
+                          className="bg-gray-200 text-gray-700 font-semibold text-sm px-6 py-2 rounded-xl hover:bg-gray-300 transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {prescriptions.length > 0 ? (
+                    <div className="space-y-2">
+                      {prescriptions.map(rx => (
+                        <div key={rx.prescriptionId} className="p-3 bg-purple-50 rounded-xl border border-purple-100 flex justify-between items-center">
+                          <div>
+                            <p className="text-sm font-semibold text-purple-900">{rx.medication}</p>
+                            <p className="text-xs text-purple-500">ID: {rx.prescriptionId} · Status: {rx.status.replace(/_/g, ' ')}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => {
+                                setEditingRx(rx)
+                                setForm({ prescriptionId: rx.prescriptionId, medication: rx.medication })
+                                setShowAddForm(true)
+                              }}
+                              className="text-xs bg-white border border-purple-200 hover:bg-purple-100 hover:text-purple-700 text-gray-600 px-2.5 py-1.5 rounded-lg font-medium transition"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRx(rx)}
+                              className="text-xs bg-white border border-red-200 hover:bg-red-100 hover:text-red-600 text-gray-600 px-2.5 py-1.5 rounded-lg font-medium transition"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-text-muted italic">No past prescriptions issued by you for this patient.</p>
+                  )}
+                </div>
+              )}
             </div>
           )
         })}
@@ -796,28 +992,56 @@ function PatientsSection({ patients, doctors, appointments, user, onRefresh, toa
 //  PRESCRIPTIONS SECTION
 // ═════════════════════════════════════════════════════════════
 
-function PrescriptionsSection({ prescriptions, patients, doctors, user, onRefresh, toast }) {
+function PrescriptionsSection({ prescriptions, patients, doctors, user, onRefresh, toast, selectedPatient }) {
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ patientId: '', prescriptionId: '', medication: '', issuedBy: '' })
+  const [editingRx, setEditingRx] = useState(null)
+  const [form, setForm] = useState({ prescriptionId: '', medication: '' })
   const [busy, setBusy] = useState(false)
+  const [localPrescriptions, setLocalPrescriptions] = useState([])
 
   const isDoctor = user.role === 'doctor'
   const isPatient = user.role === 'patient'
 
-  let displayPrescriptions = prescriptions
-  if (isPatient) displayPrescriptions = prescriptions.filter(p => p.patientId === user.referenceId)
-  if (isDoctor) displayPrescriptions = prescriptions.filter(p => p.issuedBy === user.referenceId)
+  useEffect(() => {
+    setLocalPrescriptions(prescriptions)
+  }, [prescriptions])
 
-  let actionablePatients = patients
-  if (isDoctor) actionablePatients = patients.filter(p => p.assignedDoctorId === user.referenceId)
+  useEffect(() => {
+    if (editingRx) {
+      setForm({ prescriptionId: editingRx.prescriptionId, medication: editingRx.medication })
+      setShowForm(true)
+    } else {
+      setForm({ prescriptionId: '', medication: '' })
+    }
+  }, [editingRx])
+
+  if (isDoctor && !selectedPatient) {
+    return (
+      <Section title="Prescriptions" count={0}>
+        <div className="bg-card-bg rounded-2xl p-5 shadow-soft text-center">
+          <p className="text-text-muted text-sm">Select a patient from the queue to view or manage prescriptions.</p>
+        </div>
+      </Section>
+    )
+  }
+
+  let displayPrescriptions = localPrescriptions
+  if (isPatient) displayPrescriptions = localPrescriptions.filter(p => p.patientId === user.referenceId)
+  if (isDoctor) displayPrescriptions = localPrescriptions.filter(p => p.issuedBy === user.referenceId && p.patientId === selectedPatient.id)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setBusy(true)
     try {
-      await api.createPrescription(form.patientId, form.prescriptionId, form.medication, form.issuedBy)
-      toast('Prescription created')
-      setForm({ patientId: '', prescriptionId: '', medication: '', issuedBy: '' })
+      if (editingRx) {
+        await api.updatePrescription(editingRx._id, form.medication)
+        toast('Prescription updated')
+      } else {
+        await api.createPrescription(form.prescriptionId, selectedPatient.id, form.medication)
+        toast('Prescription created')
+      }
+      setForm({ prescriptionId: '', medication: '' })
+      setEditingRx(null)
       setShowForm(false)
       await onRefresh()
     } catch (err) {
@@ -827,14 +1051,34 @@ function PrescriptionsSection({ prescriptions, patients, doctors, user, onRefres
     }
   }
 
+  const handleDelete = async (rx) => {
+    if (!window.confirm("Are you sure you want to delete this prescription?")) return
+    try {
+      setLocalPrescriptions(prev => prev.filter(item => item._id !== rx._id))
+      await api.deletePrescription(rx._id)
+      toast('Prescription deleted')
+      await onRefresh()
+    } catch (err) {
+      toast(err.message, false)
+      await onRefresh()
+    }
+  }
+
   return (
     <Section
-      title={isPatient ? "My Active Prescriptions" : "Prescriptions"}
+      title={isPatient ? "My Active Prescriptions" : `Prescriptions for ${selectedPatient.name}`}
       count={displayPrescriptions.length}
       action={
         isDoctor && (
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => {
+              if (showForm) {
+                setEditingRx(null)
+                setShowForm(false)
+              } else {
+                setShowForm(true)
+              }
+            }}
             className="text-xs bg-gradient-purple-blue text-white px-4 py-1.5 rounded-xl font-medium hover:opacity-90 transition"
           >
             {showForm ? 'Cancel' : '+ New Prescription'}
@@ -844,22 +1088,48 @@ function PrescriptionsSection({ prescriptions, patients, doctors, user, onRefres
     >
       {showForm && isDoctor && (
         <form onSubmit={handleSubmit} className="bg-purple-50 rounded-xl p-4 mb-4 grid gap-3 sm:grid-cols-2">
-          <select value={form.patientId} required onChange={e => setForm(f => ({ ...f, patientId: e.target.value }))} className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-300">
-            <option value="">Patient</option>
-            {actionablePatients.map(p => <option key={p.id} value={p.id}>{p.name} ({p.id})</option>)}
-          </select>
+          <div className="sm:col-span-2 text-xs text-purple-700 font-semibold bg-purple-100/50 p-2.5 rounded-xl border border-purple-200">
+            Prescription for: <span className="text-purple-900 font-bold">{selectedPatient.name} ({selectedPatient.id})</span>
+          </div>
 
-          <select value={form.issuedBy} required onChange={e => setForm(f => ({ ...f, issuedBy: e.target.value }))} className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-300 bg-gray-100">
-            <option value="">Issuing Doctor</option>
-            {doctors.filter(d => d.id === user.referenceId).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
+          {!editingRx && (
+            <input
+              type="text"
+              placeholder="Prescription ID (e.g. RX-100)"
+              required
+              value={form.prescriptionId}
+              onChange={e => setForm(f => ({ ...f, prescriptionId: e.target.value }))}
+              className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-300"
+            />
+          )}
 
-          <input type="text" placeholder="Prescription ID (e.g. RX-100)" required value={form.prescriptionId} onChange={e => setForm(f => ({ ...f, prescriptionId: e.target.value }))} className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-300" />
-          <input type="text" placeholder="Medication (e.g. Amoxicillin 250mg)" required value={form.medication} onChange={e => setForm(f => ({ ...f, medication: e.target.value }))} className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-300" />
+          <input
+            type="text"
+            placeholder="Medication (e.g. Amoxicillin 250mg)"
+            required
+            value={form.medication}
+            onChange={e => setForm(f => ({ ...f, medication: e.target.value }))}
+            className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-300 sm:col-span-2"
+          />
 
-          <div className="sm:col-span-2">
-            <button type="submit" disabled={busy} className="bg-gradient-purple-blue text-white font-semibold text-sm px-6 py-2 rounded-xl hover:opacity-90 disabled:opacity-40 transition">
-              {busy ? 'Creating…' : 'Create Prescription'}
+          <div className="sm:col-span-2 flex gap-2">
+            <button
+              type="submit"
+              disabled={busy}
+              className="bg-gradient-purple-blue text-white font-semibold text-sm px-6 py-2 rounded-xl hover:opacity-90 disabled:opacity-40 transition"
+            >
+              {busy ? 'Saving…' : editingRx ? 'Update Prescription' : 'Create Prescription'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowForm(false)
+                setEditingRx(null)
+                setForm({ prescriptionId: '', medication: '' })
+              }}
+              className="bg-gray-200 text-gray-700 font-semibold text-sm px-6 py-2 rounded-xl hover:bg-gray-300 transition"
+            >
+              Cancel
             </button>
           </div>
         </form>
@@ -872,7 +1142,25 @@ function PrescriptionsSection({ prescriptions, patients, doctors, user, onRefres
               <p className="font-semibold">{rx.medication}</p>
               <p className="text-text-muted text-sm">{rx.prescriptionId} · Patient: {rx.patientId} · By: {rx.issuedBy}</p>
             </div>
-            <Badge className="bg-amber-100 text-amber-700">{rx.status.replace(/_/g, ' ')}</Badge>
+            <div className="flex items-center gap-3">
+              <Badge className="bg-amber-100 text-amber-700">{rx.status.replace(/_/g, ' ')}</Badge>
+              {isDoctor && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setEditingRx(rx)}
+                    className="text-xs bg-gray-100 hover:bg-purple-100 hover:text-purple-700 text-gray-600 px-2.5 py-1.5 rounded-lg font-medium transition"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(rx)}
+                    className="text-xs bg-gray-100 hover:bg-red-100 hover:text-red-600 text-gray-600 px-2.5 py-1.5 rounded-lg font-medium transition"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         ))}
         {displayPrescriptions.length === 0 && <p className="text-text-muted text-sm">No prescriptions found</p>}

@@ -9,7 +9,37 @@ const Prescription = require("../models/Prescription");
 exports.getAll = async (req, res) => {
   try {
     const Appointment = require("../models/Appointment");
-    // Only return active data for Admin dashboard (excluding past records)
+
+    if (req.user.role === 'doctor') {
+      const doctorId = req.user.referenceId;
+      
+      // Find appointments for this doctor
+      const appointments = await Appointment.find({ doctorId, status: { $ne: 'cancelled' } }).lean();
+      
+      // Get unique patient IDs from those appointments
+      const patientIds = [...new Set(appointments.map(a => a.patientId))];
+      
+      // Find those patients
+      const patients = await Patient.find({ id: { $in: patientIds } }).lean();
+      
+      // Find prescriptions issued by this doctor
+      const currentPrescriptions = await Prescription.find({ 
+        issuedBy: doctorId, 
+        status: { $ne: 'completed' } 
+      }, "prescriptionId patientId medication status issuedBy -_id").lean();
+      
+      // Find the doctor's profile
+      const doctors = await Doctor.find({ id: doctorId }).lean();
+      
+      return res.json({ 
+        doctors: sanitize(doctors), 
+        patients: sanitize(patients), 
+        currentPrescriptions, 
+        appointments: sanitize(appointments) 
+      });
+    }
+
+    // Default admin/patient behavior
     const [doctors, patients, currentPrescriptions, appointments] = await Promise.all([
       Doctor.find({}).lean(),
       Patient.find({}).lean(),

@@ -15,4 +15,10 @@ const prescriptionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+prescriptionSchema.virtual("doctorId").get(function () {
+  return this.issuedBy;
+});
+prescriptionSchema.set("toJSON", { virtuals: true });
+prescriptionSchema.set("toObject", { virtuals: true });
+
 module.exports = mongoose.model("Prescription", prescriptionSchema);
